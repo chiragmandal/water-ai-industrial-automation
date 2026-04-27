@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Industrial Agent Platform</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141c;
+    --surface-2: #1c1c28;
+    --surface-3: #242434;
+    --border: #2a2a3a;
+    --border-hi: #3a3a52;
+    --text: #e4e4ef;
+    --text-dim: #8a8aa3;
+    --text-faint: #5a5a73;
+    --accent: #00d4ff;
+    --accent-glow: rgba(0, 212, 255, 0.15);
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #ef4444;
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse at top, rgba(0, 212, 255, 0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom, rgba(239, 68, 68, 0.03) 0%, transparent 50%),
+      var(--bg);
+  }
+
+  .app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+    display: grid;
+    gap: 16px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .header h1::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+  }
+  .header .meta {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .status-dot.online {
+    background: var(--success);
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+  }
+  .status-dot.offline {
+    background: var(--danger);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .card-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface-2);
+  }
+  .card-head h2 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .card-head .badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 2px 8px;
+    background: var(--surface-3);
+    border-radius: 4px;
+  }
+  .card-body { padding: 16px; }
+
+  /* Telemetry strip */
+  .pumps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .pump {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    transition: border-color 0.3s, transform 0.2s;
+  }
+  .pump:hover {
+    border-color: var(--border-hi);
+    transform: translateY(-1px);
+  }
+  .pump.alerting {
+    border-color: var(--danger);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.15);
+  }
+  .pump-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .pump-id {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .pump-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .pump-status.normal { background: rgba(74, 222, 128, 0.1); color: var(--success); }
+  .pump-status.warning { background: rgba(251, 191, 36, 0.1); color: var(--warning); }
+  .pump-status.critical { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+  .pump-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px 12px;
+  }
+  .metric {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .metric-label { color: var(--text-faint); width: 30px; }
+  .metric-value { color: var(--text); width: 48px; text-align: right; }
+  .metric-spark { flex: 1; height: 18px; }
+
+  /* Agent control */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .btn {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 600;
+  }
+  .btn-primary:hover {
+    background: #00b8e0;
+    border-color: #00b8e0;
+    color: #000;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border-color: var(--border);
+  }
+  .input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: var(--sans);
+    font-size: 13px;
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--bg);
+  }
+
+  /* Main grid */
+  .main {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+  }
+
+  /* Agent reasoning */
+  .reasoning {
+    min-height: 360px;
+    max-height: 520px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .reasoning::-webkit-scrollbar { width: 8px; }
+  .reasoning::-webkit-scrollbar-track { background: var(--surface); }
+  .reasoning::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 4px; }
+
+  .empty-state {
+    color: var(--text-faint);
+    font-family: var(--sans);
+    text-align: center;
+    padding: 60px 20px;
+    font-size: 13px;
+  }
+  .empty-state strong { color: var(--text-dim); display: block; margin-bottom: 4px; }
+
+  .event {
+    padding: 10px 12px;
+    border-left: 2px solid var(--border);
+    margin-bottom: 8px;
+    background: var(--surface-2);
+    border-radius: 0 6px 6px 0;
+    animation: slideIn 0.25s ease-out;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .event-tool-call { border-left-color: var(--accent); }
+  .event-tool-result { border-left-color: var(--success); }
+  .event-final { border-left-color: var(--warning); background: rgba(251, 191, 36, 0.05); }
+  .event-error { border-left-color: var(--danger); background: rgba(239, 68, 68, 0.06); }
+
+  .event-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+  .event-tool-call .event-header { color: var(--accent); }
+  .event-tool-result .event-header { color: var(--success); }
+  .event-final .event-header { color: var(--warning); }
+  .event-error .event-header { color: var(--danger); }
+
+  .event-name {
+    font-family: var(--mono);
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    font-size: 12px;
+  }
+  .event-body {
+    color: var(--text-dim);
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .event-final .event-body {
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .thinking {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent);
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .thinking-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+  }
+
+  /* Alerts */
+  .alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 520px;
+    overflow-y: auto;
+  }
+  .alert {
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    border-left: 3px solid var(--warning);
+    animation: slideIn 0.25s ease-out;
+  }
+  .alert.critical { border-left-color: var(--danger); }
+  .alert-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .alert-severity {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(251, 191, 36, 0.15);
+    color: var(--warning);
+  }
+  .alert.critical .alert-severity {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger);
+  }
+  .alert-id {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+  .alert-pump {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .alert-msg {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* Toggles */
+  .toggles {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .toggle {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: var(--surface-3);
+    color: var(--text-faint);
+    cursor: pointer;
+    border: 1px solid transparent;
+    user-select: none;
+  }
+  .toggle.active {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <h1>Industrial Agent Platform</h1>
+    <div class="meta" id="status">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">connecting...</span>
+    </div>
+  </header>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Pump Telemetry</h2>
+      <span class="badge" id="last-update">--</span>
+    </div>
+    <div class="card-body">
+      <div class="pumps" id="pumps"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Agent Control</h2>
+    </div>
+    <div class="card-body">
+      <div class="controls">
+        <button class="btn" data-pump="pump-001">Check pump-001</button>
+        <button class="btn" data-pump="pump-002">Check pump-002</button>
+        <button class="btn" data-pump="pump-003">Check pump-003</button>
+        <button class="btn" data-pump="pump-004">Check pump-004</button>
+        <input class="input" id="custom-prompt" placeholder="Or type your own instruction..." />
+        <button class="btn btn-primary" id="run-custom">Run</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="main">
+    <section class="card">
+      <div class="card-head">
+        <h2>Agent Reasoning</h2>
+        <span class="badge" id="agent-status">idle</span>
+      </div>
+      <div class="card-body">
+        <div class="reasoning" id="reasoning">
+          <div class="empty-state">
+            <strong>Agent ready</strong>
+            Pick a pump above or type a custom instruction.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Active Alerts</h2>
+        <span class="badge" id="alert-count">0</span>
+      </div>
+      <div class="card-body">
+        <div class="alerts-list" id="alerts">
+          <div class="empty-state">
+            <strong>No alerts</strong>
+            Detected anomalies will appear here.
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+</div>
+
+<script>
+const PUMPS = ['pump-001', 'pump-002', 'pump-003', 'pump-004'];
+const SPARK_LEN = 30;
+const POLL_MS = 2000;
+
+const state = {
+  history: Object.fromEntries(PUMPS.map(p => [p, {
+    temperature_c: [], vibration_mm_s: [], pressure_bar: [], flow_rate_lpm: []
+  }])),
+  injectAnomaly: new Set(),
+  alerts: [],
+  apiOnline: null,        // null = unknown, true/false once known
+  errorLogged: false,     // suppress duplicate console errors
+};
+
+function el(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+
+function setStatus(online, label) {
+  state.apiOnline = online;
+  const dot = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.classList.remove('online', 'offline');
+  if (online === true) dot.classList.add('online');
+  else if (online === false) dot.classList.add('offline');
+  text.textContent = label;
+}
+
+/**
+ * Fetch JSON from the API with strict response validation.
+ *
+ * Returns null and flips the dashboard into "API offline" mode whenever
+ * the response is not a successful JSON payload. This prevents the
+ * "<!DOCTYPE..." parse error you get if a different server (Live Server,
+ * python -m http.server, file://) serves index.html as a fallback for
+ * unknown routes.
+ */
+async function fetchJson(url, options = {}) {
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (err) {
+    onApiError('network unreachable');
+    return null;
+  }
+
+  if (!res.ok) {
+    onApiError(`HTTP ${res.status}`);
+    return null;
+  }
+
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    // Most common cause: the dashboard is being served by something
+    // other than the FastAPI app, and that server is returning HTML.
+    onApiError('non-JSON response (is the FastAPI server running on this port?)');
+    return null;
+  }
+
+  try {
+    const data = await res.json();
+    if (state.apiOnline !== true) setStatus(true, 'connected · polling 2s');
+    state.errorLogged = false;
+    return data;
+  } catch (err) {
+    onApiError('invalid JSON');
+    return null;
+  }
+}
+
+function onApiError(reason) {
+  if (state.apiOnline !== false) {
+    setStatus(false, `api offline · ${reason}`);
+    if (!state.errorLogged) {
+      console.warn('[dashboard] API unreachable:', reason,
+        '\nMake sure you started the FastAPI server with `uvicorn api.main:app`',
+        'and are loading the dashboard from http://localhost:8000 (not file:// or another port).');
+      state.errorLogged = true;
+    }
+  }
+}
+
+function sparkline(values, color) {
+  if (values.length < 2) return '<svg></svg>';
+  const w = 80, h = 18;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const step = w / (values.length - 1);
+  const points = values.map((v, i) => {
+    const x = i * step;
+    const y = h - ((v - min) / range) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg class="metric-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function classifyPump(readings) {
+  const checks = [
+    readings.temperature_c > 75,
+    readings.vibration_mm_s > 4.5,
+    readings.pressure_bar < 5,
+    readings.flow_rate_lpm < 100,
+  ];
+  const flagged = checks.filter(Boolean).length;
+  if (flagged >= 3) return 'critical';
+  if (flagged >= 1) return 'warning';
+  return 'normal';
+}
+
+function renderPumps() {
+  const container = document.getElementById('pumps');
+
+  if (state.apiOnline === false) {
+    container.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">
+      <strong>Waiting for API</strong>
+      Start the FastAPI server and reload, or check the page is served from http://localhost:8000.
+    </div>`;
+    return;
+  }
+
+  // Wait for first poll to complete before rendering anything.
+  const anyData = PUMPS.some(p => state.history[p].temperature_c.length > 0);
+  if (!anyData) {
+    container.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">
+      <strong>Waiting for first reading...</strong>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  for (const pumpId of PUMPS) {
+    const hist = state.history[pumpId];
+    const latest = {
+      temperature_c: hist.temperature_c.at(-1),
+      vibration_mm_s: hist.vibration_mm_s.at(-1),
+      pressure_bar: hist.pressure_bar.at(-1),
+      flow_rate_lpm: hist.flow_rate_lpm.at(-1),
+    };
+    if (latest.temperature_c == null) continue;
+    const status = classifyPump(latest);
+    const injected = state.injectAnomaly.has(pumpId);
+
+    const card = el(`
+      <div class="pump ${status === 'critical' ? 'alerting' : ''}">
+        <div class="pump-head">
+          <span class="pump-id">${pumpId}</span>
+          <span class="pump-status ${status}">${status}</span>
+        </div>
+        <div class="pump-metrics">
+          <div class="metric"><span class="metric-label">T</span><span class="metric-value">${latest.temperature_c.toFixed(1)}°</span>${sparkline(hist.temperature_c, '#00d4ff')}</div>
+          <div class="metric"><span class="metric-label">V</span><span class="metric-value">${latest.vibration_mm_s.toFixed(2)}</span>${sparkline(hist.vibration_mm_s, '#fbbf24')}</div>
+          <div class="metric"><span class="metric-label">P</span><span class="metric-value">${latest.pressure_bar.toFixed(2)}</span>${sparkline(hist.pressure_bar, '#4ade80')}</div>
+          <div class="metric"><span class="metric-label">F</span><span class="metric-value">${latest.flow_rate_lpm.toFixed(0)}</span>${sparkline(hist.flow_rate_lpm, '#a78bfa')}</div>
+        </div>
+        <div class="toggles">
+          <span class="toggle ${injected ? 'active' : ''}" data-inject="${pumpId}">
+            ${injected ? '⏺ injecting fault' : 'inject fault'}
+          </span>
+        </div>
+      </div>
+    `);
+    container.appendChild(card);
+  }
+
+  container.querySelectorAll('[data-inject]').forEach(t => {
+    t.onclick = () => {
+      const pid = t.dataset.inject;
+      if (state.injectAnomaly.has(pid)) state.injectAnomaly.delete(pid);
+      else state.injectAnomaly.add(pid);
+    };
+  });
+}
+
+async function pollPump(pumpId) {
+  const inject = state.injectAnomaly.has(pumpId);
+  const data = await fetchJson('/sensor/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pump_id: pumpId, inject_anomaly: inject }),
+  });
+  if (!data || !data.readings) return;
+  const hist = state.history[pumpId];
+  for (const k of Object.keys(hist)) {
+    hist[k].push(data.readings[k]);
+    if (hist[k].length > SPARK_LEN) hist[k].shift();
+  }
+}
+
+async function pollAll() {
+  await Promise.all(PUMPS.map(pollPump));
+  renderPumps();
+  if (state.apiOnline) {
+    document.getElementById('last-update').textContent =
+      new Date().toLocaleTimeString();
+  } else {
+    document.getElementById('last-update').textContent = '--';
+  }
+}
+
+async function refreshAlerts() {
+  const data = await fetchJson('/alerts');
+  if (!data) return;
+  state.alerts = data.alerts || [];
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const container = document.getElementById('alerts');
+  document.getElementById('alert-count').textContent = state.alerts.length;
+  if (state.alerts.length === 0) {
+    container.innerHTML = `<div class="empty-state"><strong>No alerts</strong>Detected anomalies will appear here.</div>`;
+    return;
+  }
+  container.innerHTML = '';
+  for (const a of [...state.alerts].reverse()) {
+    container.appendChild(el(`
+      <div class="alert ${a.severity}">
+        <div class="alert-head">
+          <span class="alert-severity">${a.severity}</span>
+          <span class="alert-id">${a.alert_id}</span>
+        </div>
+        <div class="alert-pump">${a.pump_id}</div>
+        <div class="alert-msg">${escapeHtml(a.message)}</div>
+      </div>
+    `));
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function clearReasoning() {
+  document.getElementById('reasoning').innerHTML = '';
+}
+
+function appendThinking() {
+  const r = document.getElementById('reasoning');
+  const t = el(`<div class="thinking" id="thinking-indicator">
+    <span class="thinking-dot"></span>agent thinking
+  </div>`);
+  r.appendChild(t);
+  r.scrollTop = r.scrollHeight;
+}
+
+function removeThinking() {
+  const t = document.getElementById('thinking-indicator');
+  if (t) t.remove();
+}
+
+function appendEvent(ev) {
+  removeThinking();
+  const r = document.getElementById('reasoning');
+  let node;
+  if (ev.type === 'tool_call') {
+    const args = JSON.stringify(ev.args, null, 2);
+    node = el(`<div class="event event-tool-call">
+      <div class="event-header">▶ tool call · <span class="event-name">${escapeHtml(ev.name)}</span></div>
+      <div class="event-body">${escapeHtml(args)}</div>
+    </div>`);
+  } else if (ev.type === 'tool_result') {
+    let formatted = ev.content;
+    try { formatted = JSON.stringify(JSON.parse(ev.content), null, 2); } catch {}
+    node = el(`<div class="event event-tool-result">
+      <div class="event-header">◀ tool result</div>
+      <div class="event-body">${escapeHtml(formatted)}</div>
+    </div>`);
+  } else if (ev.type === 'final_answer') {
+    node = el(`<div class="event event-final">
+      <div class="event-header">✓ final answer</div>
+      <div class="event-body">${escapeHtml(ev.content)}</div>
+    </div>`);
+  } else if (ev.type === 'error') {
+    node = el(`<div class="event event-error">
+      <div class="event-header">✕ error</div>
+      <div class="event-body">${escapeHtml(ev.message)}</div>
+    </div>`);
+  }
+  if (node) {
+    r.appendChild(node);
+    appendThinking();
+    r.scrollTop = r.scrollHeight;
+  }
+}
+
+async function runAgent(message) {
+  if (state.apiOnline === false) {
+    appendEvent({ type: 'error', message: 'API is offline. Start the FastAPI server first.' });
+    return;
+  }
+
+  clearReasoning();
+  appendThinking();
+  document.getElementById('agent-status').textContent = 'running';
+  document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+
+  try {
+    const res = await fetch('/agent/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('text/event-stream')) {
+      throw new Error('expected text/event-stream from /agent/stream');
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+      for (const part of parts) {
+        if (!part.startsWith('data: ')) continue;
+        try {
+          const ev = JSON.parse(part.slice(6));
+          if (ev.type === 'start' || ev.type === 'done') continue;
+          appendEvent(ev);
+        } catch (e) {
+          console.warn('failed to parse SSE event', e, part);
+        }
+      }
+    }
+  } catch (err) {
+    appendEvent({ type: 'error', message: err.message });
+  } finally {
+    removeThinking();
+    document.getElementById('agent-status').textContent = 'idle';
+    document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+    refreshAlerts();
+  }
+}
+
+// Wire up controls
+document.querySelectorAll('[data-pump]').forEach(b => {
+  b.onclick = () => {
+    const pid = b.dataset.pump;
+    const faultActive = state.injectAnomaly.has(pid);
+    const extra = faultActive
+      ? ` Fault injection is active for this pump — use inject_anomaly=true when querying its sensor.`
+      : '';
+    runAgent(`Check ${pid} right now and alert if anything is wrong.${extra}`);
+  };
+});
+document.getElementById('run-custom').onclick = () => {
+  const msg = document.getElementById('custom-prompt').value.trim();
+  if (msg) runAgent(msg);
+};
+document.getElementById('custom-prompt').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('run-custom').click();
+});
+
+// Boot: ping /health first so the user gets a clear signal if the API is missing.
+async function boot() {
+  const ok = await fetchJson('/health');
+  if (ok) setStatus(true, 'connected · polling 2s');
+  pollAll();
+  refreshAlerts();
+  setInterval(pollAll, POLL_MS);
+  setInterval(refreshAlerts, 5000);
+}
+
+boot();
+</script>
+</body>
+</html>

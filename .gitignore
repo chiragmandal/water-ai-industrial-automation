@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+artifacts/*.joblib
+mlruns/
+mlflow.db
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.DS_Store
+.idea/
+.vscode/
