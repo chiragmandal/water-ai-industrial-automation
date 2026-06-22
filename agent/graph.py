@@ -102,7 +102,16 @@ TOOLS_BY_NAME = {t.name: t for t in TOOLS}
 def _build_ollama_llm():
     model = os.getenv("OLLAMA_MODEL", "llama3.1")
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    return ChatOllama(model=model, base_url=base_url, temperature=0).bind_tools(TOOLS)
+    llm = ChatOllama(
+        model=model,
+        base_url=base_url,
+        temperature=0,
+        timeout=30,
+    )
+    return llm.bind_tools(TOOLS).with_retry(
+        stop_after_attempt=3,
+        wait_exponential_jitter=True,
+    )
 
 
 def _build_azure_llm():
@@ -112,13 +121,18 @@ def _build_azure_llm():
     ]
     if missing:
         raise RuntimeError(f"Azure OpenAI fallback requires: {', '.join(missing)}")
-    return AzureChatOpenAI(
+    llm = AzureChatOpenAI(
         azure_deployment=os.environ["AZURE_OPENAI_DEPLOYMENT"],
         azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
         api_key=os.environ["AZURE_OPENAI_API_KEY"],
         api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
         temperature=0,
-    ).bind_tools(TOOLS)
+        timeout=60,
+    )
+    return llm.bind_tools(TOOLS).with_retry(
+        stop_after_attempt=3,
+        wait_exponential_jitter=True,
+    )
 
 
 _LLM = None
