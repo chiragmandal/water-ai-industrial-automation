@@ -121,17 +121,38 @@ def _build_azure_llm():
     ).bind_tools(TOOLS)
 
 
+_LLM = None
+_GRAPH = None
+
+
 def build_llm():
-    """Try Ollama first; fall back to Azure OpenAI if Ollama is unreachable."""
+    """Try Ollama first; fall back to Azure OpenAI if Ollama is unreachable.
+
+    Cached at module level so the smoke test runs once at startup, not on
+    every graph step.
+    """
+    global _LLM
+    if _LLM is not None:
+        return _LLM
     try:
         llm = _build_ollama_llm()
         # Smoke-test the connection so failures surface here, not mid-graph.
         llm.invoke([HumanMessage(content="ping")])
         logger.info("Using Ollama (%s)", os.getenv("OLLAMA_MODEL", "llama3.1"))
-        return llm
+        _LLM = llm
+        return _LLM
     except Exception as ollama_err:
         logger.warning("Ollama unavailable (%s), falling back to Azure OpenAI", ollama_err)
-        return _build_azure_llm()
+        _LLM = _build_azure_llm()
+        return _LLM
+
+
+def get_graph():
+    """Compiled graph singleton."""
+    global _GRAPH
+    if _GRAPH is None:
+        _GRAPH = build_graph()
+    return _GRAPH
 
 
 def agent_node(state: AgentState) -> dict:
@@ -193,8 +214,10 @@ def _initial_state(user_message: str) -> AgentState:
 
 def run_agent(user_message: str) -> dict:
     """Run the agent on a single user message and return the final state."""
-    graph = build_graph()
-    return graph.invoke(_initial_state(user_message))
+    return get_graph().invoke(
+        _initial_state(user_message),
+        config={"recursion_limit": 10},
+    )
 
 
 async def astream_agent(user_message: str) -> AsyncGenerator[dict, None]:
@@ -203,10 +226,14 @@ async def astream_agent(user_message: str) -> AsyncGenerator[dict, None]:
     Yields structured events suitable for SSE: tool_call, tool_result,
     final_answer. Used by the dashboard to render the agent loop live.
     """
-    graph = build_graph()
+    graph = get_graph()
     state = _initial_state(user_message)
 
-    async for chunk in graph.astream(state, stream_mode="updates"):
+    async for chunk in graph.astream(
+        state,
+        stream_mode="updates",
+        config={"recursion_limit": 10},
+    ):
         for node_name, payload in chunk.items():
             for msg in payload.get("messages", []):
                 if isinstance(msg, AIMessage):
