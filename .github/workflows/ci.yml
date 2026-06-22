@@ -25,7 +25,9 @@ jobs:
           pip install ruff
 
       - name: Lint with ruff
-        run: ruff check . || true
+        run: ruff check .
+      - name: Check formatting
+        run: ruff format --check .
 
       - name: Train model
         run: python -m mlops.train

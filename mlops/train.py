@@ -18,6 +18,7 @@ import mlflow.sklearn
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
+from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -77,22 +78,22 @@ def train(contamination: float = 0.05, n_estimators: int = 200) -> dict:
             X, y, test_size=0.2, random_state=42, stratify=y
         )
 
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        X_test_scaled = scaler.transform(X_test)
+        # Pipeline keeps scaler and model versioned as one atomic artifact.
+        pipeline = Pipeline([
+            ("scaler", StandardScaler()),
+            ("iforest", IsolationForest(
+                n_estimators=n_estimators,
+                contamination=contamination,
+                random_state=42,
+                n_jobs=-1,
+            )),
+        ])
 
         # Unsupervised: fit on normal samples only.
-        X_train_normal = X_train_scaled[y_train == 0]
+        X_train_normal = X_train[y_train == 0]
+        pipeline.fit(X_train_normal)
 
-        model = IsolationForest(
-            n_estimators=n_estimators,
-            contamination=contamination,
-            random_state=42,
-            n_jobs=-1,
-        )
-        model.fit(X_train_normal)
-
-        preds = model.predict(X_test_scaled)
+        preds = pipeline.predict(X_test)
         # Isolation Forest returns 1 for inliers and -1 for outliers.
         y_pred = (preds == -1).astype(int)
 
@@ -111,12 +112,10 @@ def train(contamination: float = 0.05, n_estimators: int = 200) -> dict:
             "accuracy": report["accuracy"],
         })
 
-        mlflow.sklearn.log_model(model, name="anomaly_model")
+        mlflow.sklearn.log_model(pipeline, artifact_path="anomaly_pipeline")
 
-        # Persist locally so the MCP tool can load the model without MLflow.
-        joblib.dump(model, ARTIFACTS_DIR / "anomaly_model.joblib")
-        joblib.dump(scaler, ARTIFACTS_DIR / "scaler.joblib")
-
+        # Persist locally so the MCP tool can load without MLflow at runtime.
+        joblib.dump(pipeline, ARTIFACTS_DIR / "anomaly_pipeline.joblib")
         logger.info("Training complete. Run ID: %s", run.info.run_id)
         print(classification_report(y_test, y_pred))
 

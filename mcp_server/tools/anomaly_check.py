@@ -13,25 +13,22 @@ logger = logging.getLogger(__name__)
 ARTIFACTS_DIR = Path(__file__).parent.parent.parent / "artifacts"
 FEATURES = ["temperature_c", "vibration_mm_s", "pressure_bar", "flow_rate_lpm"]
 
-_model = None
-_scaler = None
+_pipeline = None
 
 
-def _load_artifacts() -> tuple[Any, Any]:
-    """Lazy load the model and scaler. Raises if training has not run."""
-    global _model, _scaler
-    if _model is None or _scaler is None:
-        model_path = ARTIFACTS_DIR / "anomaly_model.joblib"
-        scaler_path = ARTIFACTS_DIR / "scaler.joblib"
-        if not model_path.exists() or not scaler_path.exists():
+def _load_artifacts():
+    """Lazy load the pipeline. Raises if training has not run."""
+    global _pipeline
+    if _pipeline is None:
+        path = ARTIFACTS_DIR / "anomaly_pipeline.joblib"
+        if not path.exists():
             raise FileNotFoundError(
-                f"Model artifacts not found in {ARTIFACTS_DIR}. "
+                f"Pipeline artifact not found at {path}. "
                 "Run `python -m mlops.train` first."
             )
-        _model = joblib.load(model_path)
-        _scaler = joblib.load(scaler_path)
-        logger.info("Loaded anomaly model and scaler from %s", ARTIFACTS_DIR)
-    return _model, _scaler
+        _pipeline = joblib.load(path)
+        logger.info("Loaded anomaly pipeline from %s", path)
+    return _pipeline
 
 
 def check_anomaly(readings: dict[str, float]) -> dict[str, Any]:
@@ -45,13 +42,14 @@ def check_anomaly(readings: dict[str, float]) -> dict[str, Any]:
     if missing:
         return {"is_anomaly": False, "error": f"Missing features: {missing}"}
 
-    model, scaler = _load_artifacts()
+    pipeline = _load_artifacts()
 
     x = np.array([[readings[f] for f in FEATURES]])
-    x_scaled = scaler.transform(x)
 
-    pred = int(model.predict(x_scaled)[0])
-    score = float(model.score_samples(x_scaled)[0])
+    pred = int(pipeline.predict(x)[0])
+    score = float(pipeline.named_steps["iforest"].score_samples(
+        pipeline.named_steps["scaler"].transform(x)
+    )[0])
 
     is_anomaly = pred == -1
     # Severity must derive from is_anomaly to stay consistent. A point can
