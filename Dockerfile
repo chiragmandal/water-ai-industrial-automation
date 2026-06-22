@@ -14,6 +14,7 @@ COPY . .
 # Train the anomaly model at build time so the image is self contained.
 # The MLFLOW_TRACKING_URI defaults to a local file store inside the image.
 RUN python -m mlops.train
+ENV MODEL_SOURCE=baked
 
 EXPOSE 8000
 
