@@ -31,6 +31,27 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
+
+import uuid
+from contextvars import ContextVar
+
+correlation_id_var: ContextVar[str] = ContextVar("correlation_id", default="-")
+
+
+class CorrelationIdFilter(logging.Filter):
+    def filter(self, record):
+        record.correlation_id = correlation_id_var.get()
+        return True
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(correlation_id)s] %(name)s %(message)s",
+    force=True,
+)
+for handler in logging.root.handlers:
+    handler.addFilter(CorrelationIdFilter())
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,6 +69,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from fastapi import Request
+
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    cid = request.headers.get("x-correlation-id", str(uuid.uuid4()))
+    token = correlation_id_var.set(cid)
+    try:
+        response = await call_next(request)
+    finally:
+        correlation_id_var.reset(token)
+    response.headers["x-correlation-id"] = cid
+    return response
 
 class AgentRequest(BaseModel):
     message: str = Field(..., description="Natural language instruction for the agent.")
