@@ -7,6 +7,7 @@ This implements the Model Context Protocol over stdio. Any MCP
 compatible client (Claude Desktop, Cursor, custom LangGraph clients,
 etc.) can connect and discover the tools below.
 """
+
 from __future__ import annotations
 
 import asyncio

@@ -1,4 +1,5 @@
 """Anomaly detection tool that calls the trained ML model."""
+
 from __future__ import annotations
 
 import logging
@@ -47,9 +48,11 @@ def check_anomaly(readings: dict[str, float]) -> dict[str, Any]:
     x = np.array([[readings[f] for f in FEATURES]])
 
     pred = int(pipeline.predict(x)[0])
-    score = float(pipeline.named_steps["iforest"].score_samples(
-        pipeline.named_steps["scaler"].transform(x)
-    )[0])
+    score = float(
+        pipeline.named_steps["iforest"].score_samples(
+            pipeline.named_steps["scaler"].transform(x)
+        )[0]
+    )
 
     is_anomaly = pred == -1
     # Severity must derive from is_anomaly to stay consistent. A point can

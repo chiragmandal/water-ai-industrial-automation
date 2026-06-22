@@ -1,4 +1,5 @@
 """Basic tests for the industrial agent platform."""
+
 from __future__ import annotations
 
 import pathlib
@@ -40,27 +41,33 @@ def test_query_sensor_anomaly_injection():
 
 
 def test_anomaly_check_requires_trained_model():
-    artifacts = pathlib.Path(__file__).parent.parent / "artifacts" / "anomaly_model.joblib"
+    artifacts = (
+        pathlib.Path(__file__).parent.parent / "artifacts" / "anomaly_model.joblib"
+    )
     if not artifacts.exists():
         pytest.skip("Model not trained yet. Run `python -m mlops.train`.")
 
     from mcp_server.tools.anomaly_check import check_anomaly
 
-    normal = check_anomaly({
-        "temperature_c": 65,
-        "vibration_mm_s": 2.5,
-        "pressure_bar": 6.0,
-        "flow_rate_lpm": 120,
-    })
+    normal = check_anomaly(
+        {
+            "temperature_c": 65,
+            "vibration_mm_s": 2.5,
+            "pressure_bar": 6.0,
+            "flow_rate_lpm": 120,
+        }
+    )
     assert "is_anomaly" in normal
     assert normal["is_anomaly"] is False
 
-    anomalous = check_anomaly({
-        "temperature_c": 90,
-        "vibration_mm_s": 9.0,
-        "pressure_bar": 3.0,
-        "flow_rate_lpm": 60,
-    })
+    anomalous = check_anomaly(
+        {
+            "temperature_c": 90,
+            "vibration_mm_s": 9.0,
+            "pressure_bar": 3.0,
+            "flow_rate_lpm": 60,
+        }
+    )
     assert anomalous["is_anomaly"] is True
     assert anomalous["severity"] in {"warning", "critical"}
 

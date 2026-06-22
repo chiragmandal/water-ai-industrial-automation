@@ -4,6 +4,7 @@ Generates realistic pump telemetry. In a real deployment this would
 query an industrial historian like OSIsoft PI, an OPC UA server, or
 a time-series database such as InfluxDB or TimescaleDB.
 """
+
 from __future__ import annotations
 
 import random
@@ -13,7 +14,9 @@ from typing import Any
 PUMPS = ["pump-001", "pump-002", "pump-003", "pump-004"]
 
 
-def query_sensor(pump_id: str | None = None, inject_anomaly: bool = False) -> dict[str, Any]:
+def query_sensor(
+    pump_id: str | None = None, inject_anomaly: bool = False
+) -> dict[str, Any]:
     """Return current sensor readings for an industrial pump.
 
     Args:

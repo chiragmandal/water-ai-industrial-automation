@@ -13,6 +13,7 @@ To enable real Azure ML execution:
     export AZURE_RESOURCE_GROUP=...
     export AZURE_ML_WORKSPACE=...
 """
+
 from __future__ import annotations
 
 import logging
@@ -58,7 +59,9 @@ def submit_training_job(config: AzureMLConfig | None = None) -> dict[str, Any]:
         from azure.ai.ml.entities import Environment
         from azure.identity import DefaultAzureCredential
     except ImportError:
-        logger.error("azure-ai-ml not installed. Run: pip install azure-ai-ml azure-identity")
+        logger.error(
+            "azure-ai-ml not installed. Run: pip install azure-ai-ml azure-identity"
+        )
         return {"status": "error", "message": "azure-ai-ml not installed"}
 
     ml_client = MLClient(

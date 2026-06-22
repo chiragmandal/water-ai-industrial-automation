@@ -7,6 +7,7 @@ and flow rate readings.
 Usage:
     python -m mlops.train
 """
+
 from __future__ import annotations
 
 import logging
@@ -44,21 +45,25 @@ def generate_synthetic_pump_data(
     """
     rng = np.random.default_rng(seed)
 
-    normal = pd.DataFrame({
-        "temperature_c": rng.normal(65, 4, n_normal),
-        "vibration_mm_s": rng.normal(2.5, 0.5, n_normal),
-        "pressure_bar": rng.normal(6.0, 0.4, n_normal),
-        "flow_rate_lpm": rng.normal(120, 8, n_normal),
-        "label": 0,
-    })
+    normal = pd.DataFrame(
+        {
+            "temperature_c": rng.normal(65, 4, n_normal),
+            "vibration_mm_s": rng.normal(2.5, 0.5, n_normal),
+            "pressure_bar": rng.normal(6.0, 0.4, n_normal),
+            "flow_rate_lpm": rng.normal(120, 8, n_normal),
+            "label": 0,
+        }
+    )
 
-    anomalies = pd.DataFrame({
-        "temperature_c": rng.normal(85, 6, n_anomaly),
-        "vibration_mm_s": rng.normal(7.5, 1.2, n_anomaly),
-        "pressure_bar": rng.normal(3.5, 0.8, n_anomaly),
-        "flow_rate_lpm": rng.normal(70, 15, n_anomaly),
-        "label": 1,
-    })
+    anomalies = pd.DataFrame(
+        {
+            "temperature_c": rng.normal(85, 6, n_anomaly),
+            "vibration_mm_s": rng.normal(7.5, 1.2, n_anomaly),
+            "pressure_bar": rng.normal(3.5, 0.8, n_anomaly),
+            "flow_rate_lpm": rng.normal(70, 15, n_anomaly),
+            "label": 1,
+        }
+    )
 
     df = pd.concat([normal, anomalies], ignore_index=True)
     return df.sample(frac=1, random_state=seed).reset_index(drop=True)
@@ -79,15 +84,20 @@ def train(contamination: float = 0.05, n_estimators: int = 200) -> dict:
         )
 
         # Pipeline keeps scaler and model versioned as one atomic artifact.
-        pipeline = Pipeline([
-            ("scaler", StandardScaler()),
-            ("iforest", IsolationForest(
-                n_estimators=n_estimators,
-                contamination=contamination,
-                random_state=42,
-                n_jobs=-1,
-            )),
-        ])
+        pipeline = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                (
+                    "iforest",
+                    IsolationForest(
+                        n_estimators=n_estimators,
+                        contamination=contamination,
+                        random_state=42,
+                        n_jobs=-1,
+                    ),
+                ),
+            ]
+        )
 
         # Unsupervised: fit on normal samples only.
         X_train_normal = X_train[y_train == 0]
@@ -99,18 +109,22 @@ def train(contamination: float = 0.05, n_estimators: int = 200) -> dict:
 
         report = classification_report(y_test, y_pred, output_dict=True)
 
-        mlflow.log_params({
-            "n_estimators": n_estimators,
-            "contamination": contamination,
-            "n_train_samples": len(X_train_normal),
-            "features": ",".join(FEATURES),
-        })
-        mlflow.log_metrics({
-            "precision": report["1"]["precision"],
-            "recall": report["1"]["recall"],
-            "f1_score": report["1"]["f1-score"],
-            "accuracy": report["accuracy"],
-        })
+        mlflow.log_params(
+            {
+                "n_estimators": n_estimators,
+                "contamination": contamination,
+                "n_train_samples": len(X_train_normal),
+                "features": ",".join(FEATURES),
+            }
+        )
+        mlflow.log_metrics(
+            {
+                "precision": report["1"]["precision"],
+                "recall": report["1"]["recall"],
+                "f1_score": report["1"]["f1-score"],
+                "accuracy": report["accuracy"],
+            }
+        )
 
         mlflow.sklearn.log_model(pipeline, artifact_path="anomaly_pipeline")
 

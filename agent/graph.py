@@ -8,6 +8,7 @@ OpenAI. Override via OLLAMA_MODEL / AZURE_OPENAI_* env vars.
 The tools below wrap the same business logic that the MCP server
 exposes, so the agent and external MCP clients stay in sync.
 """
+
 from __future__ import annotations
 
 import json
@@ -63,12 +64,14 @@ def check_anomaly_tool(
 
     Returns severity (normal, warning, critical) and an anomaly score.
     """
-    result = check_anomaly({
-        "temperature_c": temperature_c,
-        "vibration_mm_s": vibration_mm_s,
-        "pressure_bar": pressure_bar,
-        "flow_rate_lpm": flow_rate_lpm,
-    })
+    result = check_anomaly(
+        {
+            "temperature_c": temperature_c,
+            "vibration_mm_s": vibration_mm_s,
+            "pressure_bar": pressure_bar,
+            "flow_rate_lpm": flow_rate_lpm,
+        }
+    )
     return json.dumps(result)
 
 
@@ -116,7 +119,12 @@ def _build_ollama_llm():
 
 def _build_azure_llm():
     missing = [
-        v for v in ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT")
+        v
+        for v in (
+            "AZURE_OPENAI_API_KEY",
+            "AZURE_OPENAI_ENDPOINT",
+            "AZURE_OPENAI_DEPLOYMENT",
+        )
         if not os.getenv(v)
     ]
     if missing:
@@ -156,7 +164,9 @@ def build_llm():
         _LLM = llm
         return _LLM
     except Exception as ollama_err:
-        logger.warning("Ollama unavailable (%s), falling back to Azure OpenAI", ollama_err)
+        logger.warning(
+            "Ollama unavailable (%s), falling back to Azure OpenAI", ollama_err
+        )
         _LLM = _build_azure_llm()
         return _LLM
 

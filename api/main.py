@@ -7,17 +7,21 @@ Exposes:
   POST /anomaly/check     direct anomaly model scoring
   GET  /alerts            list raised alerts
 """
+
 from __future__ import annotations
 
 import json
 import logging
+import uuid
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
 from agent.graph import astream_agent, run_agent
@@ -31,9 +35,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
-
-import uuid
-from contextvars import ContextVar
 
 correlation_id_var: ContextVar[str] = ContextVar("correlation_id", default="-")
 
@@ -69,11 +70,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-from prometheus_fastapi_instrumentator import Instrumentator
-
-Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
-
-from fastapi import Request
+Instrumentator().instrument(app).expose(
+    app, endpoint="/metrics", include_in_schema=False
+)
 
 
 @app.middleware("http")
@@ -86,6 +85,7 @@ async def correlation_id_middleware(request: Request, call_next):
         correlation_id_var.reset(token)
     response.headers["x-correlation-id"] = cid
     return response
+
 
 class AgentRequest(BaseModel):
     message: str = Field(..., description="Natural language instruction for the agent.")
@@ -135,6 +135,7 @@ async def agent_stream(req: AgentRequest) -> StreamingResponse:
     The frontend dashboard consumes this to render tool calls and
     results in real time as the LangGraph executes.
     """
+
     async def event_generator():
         try:
             yield f"data: {json.dumps({'type': 'start'})}\n\n"
@@ -173,11 +174,13 @@ async def agent_run(req: AgentRequest) -> AgentResponse:
                 {"name": tc["name"], "args": tc["args"]}
                 for tc in (msg.tool_calls or [])
             ]
-            trace.append(AgentMessageDTO(
-                role="assistant",
-                content=str(msg.content) if msg.content else "",
-                tool_calls=tool_calls or None,
-            ))
+            trace.append(
+                AgentMessageDTO(
+                    role="assistant",
+                    content=str(msg.content) if msg.content else "",
+                    tool_calls=tool_calls or None,
+                )
+            )
             if msg.content and not msg.tool_calls:
                 final_answer = str(msg.content)
         elif isinstance(msg, ToolMessage):
@@ -203,4 +206,5 @@ async def alerts() -> dict:
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
