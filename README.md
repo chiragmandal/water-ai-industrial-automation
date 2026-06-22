@@ -10,7 +10,7 @@ An AI agent system that monitors simulated industrial pump telemetry, detects an
 *All four pumps reporting normal telemetry with live sparklines. The agent has raised two critical alerts for pump-003 after fault injection.*
 
 ![Dashboard alerts — critical fault on pump-003](docs/screenshots/dashboard-alerts.png)
-*Agent Reasoning panel streaming tool calls in real time. Active Alerts panel showing two critical alerts triggered by the agent after it ran the anomaly model.*
+*Agent Reasoning panel streaming tool calls in real time. Active Alerts panel showing one critical alert triggered by the agent after it ran the anomaly model.*
 
 ---
 
