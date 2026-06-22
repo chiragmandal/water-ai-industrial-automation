@@ -54,14 +54,14 @@ def check_anomaly(readings: dict[str, float]) -> dict[str, Any]:
     score = float(model.score_samples(x_scaled)[0])
 
     is_anomaly = pred == -1
-    # Lower scores indicate stronger anomaly. Thresholds are tuned for
-    # the synthetic distribution and would be re-calibrated in prod.
-    if score < -0.2:
-        severity = "critical"
-    elif score < -0.1:
-        severity = "warning"
-    else:
+    # Severity must derive from is_anomaly to stay consistent. A point can
+    # have a borderline score but be classed as an inlier; that's not an alert.
+    if not is_anomaly:
         severity = "normal"
+    elif score < -0.2:
+        severity = "critical"
+    else:
+        severity = "warning"
 
     return {
         "is_anomaly": is_anomaly,
