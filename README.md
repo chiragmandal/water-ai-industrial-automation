@@ -29,12 +29,13 @@ An AI agent system that monitors simulated industrial pump telemetry, detects an
 | Agent framework    | LangGraph + LangChain                              |
 | Tool protocol      | Anthropic MCP Python SDK                           |
 | API                | FastAPI + Uvicorn                                  |
+| Observability      | Prometheus via `prometheus-fastapi-instrumentator`  |
 | Dashboard          | Vanilla HTML/JS, SSE streaming (no build step)     |
-| Anomaly model      | scikit-learn Isolation Forest                      |
+| Anomaly model      | scikit-learn Pipeline (StandardScaler → IsolationForest) |
 | Experiment tracker | MLflow                                             |
 | Cloud training     | Azure ML SDK v2 (stubbed locally)                  |
 | Container          | Docker + Docker Compose                            |
-| CI/CD              | GitHub Actions                                     |
+| CI/CD              | GitHub Actions (ruff lint + pytest + Docker build)  |
 
 ---
 
@@ -202,11 +203,14 @@ The same four tools (`query_sensor`, `check_anomaly`, `trigger_alert`, `list_ale
 |--------|------------------|------------------------------------------------------|
 | GET    | `/`              | Live dashboard (HTML)                                |
 | GET    | `/health`        | Liveness probe                                       |
+| GET    | `/metrics`       | Prometheus metrics (auto-instrumented)               |
 | POST   | `/agent/run`     | Run agent, return `final_answer` + full `trace`      |
 | POST   | `/agent/stream`  | Stream agent events as SSE (`tool_call`, `tool_result`, `final_answer`) |
 | POST   | `/sensor/query`  | Direct sensor read (`pump_id`, `inject_anomaly`)     |
 | POST   | `/anomaly/check` | Direct model scoring (four feature floats)           |
 | GET    | `/alerts`        | List all alerts raised this session                  |
+
+Every request is tagged with a unique `X-Correlation-ID` header (auto-generated if not provided), making it easy to trace agent runs end-to-end in logs.
 
 `/agent/run` response shape:
 
@@ -230,7 +234,9 @@ The same four tools (`query_sensor`, `check_anomaly`, `trigger_alert`, `list_ale
 
 ## Anomaly model
 
-The `IsolationForest` is trained **only on normal samples** (proper unsupervised setup). Synthetic data simulates four pump states across temperature, vibration, pressure, and flow. Anomaly profiles roughly match cavitation, bearing failure, and partial blockage.
+The anomaly detector is an **sklearn `Pipeline`** (`StandardScaler` → `IsolationForest`) trained **only on normal samples** (proper unsupervised setup). Wrapping the scaler and model in a single pipeline ensures that feature scaling is always applied consistently during both training and inference — no separate transform step to forget.
+
+Synthetic data simulates four pump states across temperature, vibration, pressure, and flow. Anomaly profiles roughly match cavitation, bearing failure, and partial blockage.
 
 | Metric    | Typical value |
 |-----------|---------------|
@@ -239,7 +245,7 @@ The `IsolationForest` is trained **only on normal samples** (proper unsupervised
 | Precision | ~53%          |
 | F1        | ~0.69         |
 
-High recall is the priority: missing a real fault is worse than a false alarm. Every training run is logged to MLflow with params, metrics, and the serialized model. Artifacts are also dumped to `artifacts/` so inference has zero MLflow dependency at runtime.
+High recall is the priority: missing a real fault is worse than a false alarm. Every training run is logged to MLflow with params, metrics, and the serialized pipeline. The pipeline artifact is also saved to `artifacts/anomaly_pipeline.joblib` so inference has zero MLflow dependency at runtime.
 
 ---
 
@@ -272,7 +278,12 @@ The same `train.py` runs on the Azure compute cluster. No changes to the agent o
 pytest -v
 ```
 
-CI (`.github/workflows/ci.yml`) runs on every push: lint → train model → test → build Docker image.
+CI (`.github/workflows/ci.yml`) runs on every push to `main` and on pull requests:
+
+1. **Lint** — `ruff check` and `ruff format --check` enforce style (CI fails on violations)
+2. **Train** — builds the anomaly pipeline from scratch
+3. **Test** — `pytest -v`
+4. **Docker build** — builds the production image (depends on lint + test passing)
 
 ---
 
@@ -314,7 +325,7 @@ industrial-agent-platform/
 
 - Replace in-memory alert log with a persistent queue (Redis, Postgres, or a real CMMS connector)
 - Move anomaly thresholds out of code into a config service, with per-pump calibration
-- Add OpenTelemetry tracing on the FastAPI layer and LangGraph tool nodes, export to Grafana/Tempo
+- Add OpenTelemetry tracing on LangGraph tool nodes, export to Grafana/Tempo (Prometheus request metrics are already instrumented)
 - Secrets from a vault, not `.env`
 - Replace synthetic telemetry with a real OPC UA or MQTT client streaming into a time-series store (InfluxDB, TimescaleDB, OSIsoft PI)
 - Train per-pump models (or one model with pump-id embedding) once real data is available
