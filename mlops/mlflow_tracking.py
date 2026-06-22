@@ -6,7 +6,7 @@ import os
 
 import mlflow
 
-DEFAULT_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns")
+DEFAULT_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlruns/mlflow.db")
 
 
 def configure_mlflow(tracking_uri: str | None = None) -> None:
